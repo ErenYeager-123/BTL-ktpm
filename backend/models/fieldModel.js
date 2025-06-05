@@ -1,63 +1,64 @@
-const pool = require('../config/db');
+const db = require('../config/db');
 
-class FieldModel {
-  static async getAllFields() {
-    try {
-      const [rows] = await pool.query('SELECT * FROM sanbong WHERE idChusan = ?', [process.env.DEFAULT_OWNER_ID]);
-      return rows;
-    } catch (error) {
-      throw new Error(`Lỗi lấy danh sách sân: ${error.message}`);
-    }
+module.exports.getAllFields = async (idChusan) => {
+  const query = `
+    SELECT f.id, f.tenSan, ft.tenLoaiSan, f.diaChi, f.khungGio, f.giaSan, f.trangThai
+    FROM fields f
+    JOIN field_types ft ON f.loaiSan = ft.id
+    WHERE f.idChusan = ?;
+  `;
+  const [rows] = await db.execute(query, [idChusan]);
+  return rows;
+};
+
+module.exports.getFieldById = async (id, idChusan) => {
+  const query = `
+    SELECT f.id, f.tenSan, ft.tenLoaiSan, f.diaChi, f.khungGio, f.giaSan, f.trangThai
+    FROM fields f
+    JOIN field_types ft ON f.loaiSan = ft.id
+    WHERE f.id = ? AND f.idChusan = ?;
+  `;
+  const [rows] = await db.execute(query, [id, idChusan]);
+  return rows.length > 0 ? rows[0] : null;
+};
+
+module.exports.createField = async ({ tenSan, loaiSan, diaChi, khungGio, giaSan, trangThai, idChusan }) => {
+  const query = `
+    INSERT INTO fields (tenSan, loaiSan, diaChi, khungGio, giaSan, trangThai, idChusan)
+    VALUES (?, ?, ?, ?, ?, ?, ?);
+  `;
+  const [result] = await db.execute(query, [tenSan, loaiSan, diaChi, khungGio, giaSan, trangThai, idChusan]);
+  return { id: result.insertId, tenSan, loaiSan, diaChi, khungGio, giaSan, trangThai };
+};
+
+module.exports.updateField = async (id, { tenSan, loaiSan, diaChi, khungGio, giaSan, trangThai }, idChusan) => {
+  const checkQuery = `
+    SELECT id FROM fields WHERE id = ? AND idChusan = ?;
+  `;
+  const [rows] = await db.execute(checkQuery, [id, idChusan]);
+  if (rows.length === 0) {
+    return null; // Sân không tồn tại hoặc không thuộc chủ sân
   }
 
-  static async getFieldById(id) {
-    try {
-      const [rows] = await pool.query('SELECT * FROM sanbong WHERE idSan = ? AND idChusan = ?', [id, process.env.DEFAULT_OWNER_ID]);
-      return rows[0];
-    } catch (error) {
-      throw new Error(`Lỗi lấy thông tin sân theo ID: ${error.message}`);
-    }
+  const updateQuery = `
+    UPDATE fields
+    SET tenSan = ?, loaiSan = ?, diaChi = ?, khungGio = ?, giaSan = ?, trangThai = ?
+    WHERE id = ?;
+  `;
+  await db.execute(updateQuery, [tenSan, loaiSan, diaChi, khungGio, giaSan, trangThai, id]);
+  return { id, tenSan, loaiSan, diaChi, khungGio, giaSan, trangThai };
+};
+
+module.exports.deleteField = async (id, idChusan) => {
+  const checkQuery = `
+    SELECT id FROM fields WHERE id = ? AND idChusan = ?;
+  `;
+  const [rows] = await db.execute(checkQuery, [id, idChusan]);
+  if (rows.length === 0) {
+    return false; // Sân không tồn tại hoặc không thuộc chủ sân
   }
 
-  static async createField(fieldData) {
-    try {
-      const { tenSan, loaiSan, diaChi, khungGio, giaSan, trangThai } = fieldData;
-      const [result] = await pool.query(
-        'INSERT INTO sanbong (tenSan, loaiSan, diaChi, khungGio, giaSan, trangThai, idChusan) VALUES (?, ?, ?, ?, ?, ?, ?)',
-        [tenSan, loaiSan, diaChi, khungGio, giaSan, trangThai, process.env.DEFAULT_OWNER_ID]
-      );
-      return { idSan: result.insertId, ...fieldData, idChusan: process.env.DEFAULT_OWNER_ID };
-    } catch (error) {
-      throw new Error(`Lỗi tạo sân: ${error.message}`);
-    }
-  }
-
-  static async updateField(id, fieldData) {
-    try {
-      const { tenSan, loaiSan, diaChi, khungGio, giaSan, trangThai } = fieldData;
-      const [result] = await pool.query(
-        'UPDATE sanbong SET tenSan = ?, loaiSan = ?, diaChi = ?, khungGio = ?, giaSan = ?, trangThai = ? WHERE idSan = ? AND idChusan = ?',
-        [tenSan, loaiSan, diaChi, khungGio, giaSan, trangThai, id, process.env.DEFAULT_OWNER_ID]
-      );
-      if (result.affectedRows === 0) {
-        throw new Error('Sân không tồn tại hoặc không được phép');
-      }
-      return { idSan: id, ...fieldData, idChusan: process.env.DEFAULT_OWNER_ID };
-    } catch (error) {
-      throw new Error(`Lỗi cập nhật sân: ${error.message}`);
-    }
-  }
-
-  static async deleteField(id) {
-    try {
-      const [result] = await pool.query('DELETE FROM sanbong WHERE idSan = ? AND idChusan = ?', [id, process.env.DEFAULT_OWNER_ID]);
-      if (result.affectedRows === 0) {
-        throw new Error('Sân không tồn tại hoặc không được phép');
-      }
-    } catch (error) {
-      throw new Error(`Lỗi xóa sân: ${error.message}`);
-    }
-  }
-}
-
-module.exports = FieldModel;
+  const deleteQuery = `DELETE FROM fields WHERE id = ?;`;
+  await db.execute(deleteQuery, [id]);
+  return true;
+};
