@@ -7,7 +7,6 @@ import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
 import { Badge } from "@/components/ui/badge";
 import { Field } from "@/types/field";
-import { mockFields } from "@/lib/mock-data";
 import Link from "next/link";
 import { useToast } from "@/hooks/use-toast";
 
@@ -20,16 +19,19 @@ export default function FieldDetailPage() {
   const { toast } = useToast();
 
   useEffect(() => {
-    // Simulate API call
-    const fetchField = () => {
+    const fetchField = async () => {
       setLoading(true);
-      setTimeout(() => {
-        const foundField = mockFields.find((f) => f.id === id);
-        if (foundField) {
-          setField(foundField);
-        }
+      try {
+        const response = await fetch(`http://localhost:5000/api/fields/public/${id}`);
+        if (!response.ok) throw new Error("Failed to fetch field");
+
+        const data = await response.json() as Field; // Ép kiểu dữ liệu
+        setField(data);
+      } catch (error) {
+        console.error("Error fetching field:", error);
+      } finally {
         setLoading(false);
-      }, 1000);
+      }
     };
 
     fetchField();
@@ -81,11 +83,7 @@ export default function FieldDetailPage() {
     <div className="min-h-screen pt-24 pb-12">
       <div className="container mx-auto px-4">
         <div className="mb-6">
-          <Button
-            variant="ghost"
-            className="pl-0 mb-2"
-            asChild
-          >
+          <Button variant="ghost" className="pl-0 mb-2" asChild>
             <Link href="/fields" className="flex items-center">
               <ChevronLeft className="h-4 w-4 mr-1" /> Quay lại
             </Link>

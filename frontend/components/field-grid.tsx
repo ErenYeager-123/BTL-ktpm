@@ -4,7 +4,6 @@ import { useState, useEffect } from "react";
 import Link from "next/link";
 import { FieldCard } from "@/components/field-card";
 import { Skeleton } from "@/components/ui/skeleton";
-import { mockFields } from "@/lib/mock-data";
 import { Field } from "@/types/field";
 
 interface FieldGridProps {
@@ -14,34 +13,50 @@ interface FieldGridProps {
 
 export function FieldGrid({ limit, fields }: FieldGridProps) {
   const [loading, setLoading] = useState(true);
-  const displayFields = fields || (limit ? mockFields.slice(0, limit) : mockFields);
+  const [fetchedFields, setFetchedFields] = useState<Field[]>([]);
 
   useEffect(() => {
-    // Simulate API call
-    const fetchFields = () => {
+    if (fields) {
+      setLoading(false);
+      return;
+    }
+    const fetchFields = async () => {
       setLoading(true);
-      setTimeout(() => {
+      try {
+        const res = await fetch("http://localhost:5000/api/fields/public");
+        if (!res.ok) throw new Error("Failed to fetch fields");
+        const data = await res.json();
+        setFetchedFields(limit ? data.slice(0, limit) : data);
+      } catch (error) {
+        setFetchedFields([]);
+      } finally {
         setLoading(false);
-      }, 1000);
+      }
     };
-
     fetchFields();
-  }, [fields]);
+  }, [fields, limit]);
+
+  const displayFields = fields || fetchedFields;
 
   if (loading) {
     return (
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-        {Array(limit || 6).fill(0).map((_, i) => (
-          <div key={i} className="rounded-lg overflow-hidden border bg-card shadow-sm">
-            <Skeleton className="h-48 w-full" />
-            <div className="p-4 space-y-3">
-              <Skeleton className="h-6 w-3/4" />
-              <Skeleton className="h-4 w-1/2" />
-              <Skeleton className="h-4 w-1/3" />
-              <Skeleton className="h-10 w-full mt-4" />
+        {Array(limit || 6)
+          .fill(0)
+          .map((_, i) => (
+            <div
+              key={i}
+              className="rounded-lg overflow-hidden border bg-card shadow-sm"
+            >
+              <Skeleton className="h-48 w-full" />
+              <div className="p-4 space-y-3">
+                <Skeleton className="h-6 w-3/4" />
+                <Skeleton className="h-4 w-1/2" />
+                <Skeleton className="h-4 w-1/3" />
+                <Skeleton className="h-10 w-full mt-4" />
+              </div>
             </div>
-          </div>
-        ))}
+          ))}
       </div>
     );
   }

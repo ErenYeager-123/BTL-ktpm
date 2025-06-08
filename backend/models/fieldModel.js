@@ -62,3 +62,24 @@ module.exports.deleteField = async (id, idChusan) => {
   await db.execute(deleteQuery, [id]);
   return true;
 };
+
+module.exports.getAllFieldsPublic = async () => {
+  const query = `
+    SELECT f.id, f.tenSan, ft.tenLoaiSan, f.diaChi, f.khungGio, f.giaSan, f.trangThai
+    FROM fields f
+    JOIN field_types ft ON f.loaiSan = ft.id;
+  `;
+  const [rows] = await db.execute(query);
+  return rows;
+};
+
+module.exports.getFieldByIdPublic = async (id) => {
+  const query = `
+    SELECT f.id, f.tenSan, ft.tenLoaiSan, f.diaChi, f.khungGio, f.giaSan, f.trangThai
+    FROM fields f
+    JOIN field_types ft ON f.loaiSan = ft.id
+    WHERE f.id = ?;
+  `;
+  const [rows] = await db.execute(query, [id]);
+  return rows.length > 0 ? rows[0] : null;
+};

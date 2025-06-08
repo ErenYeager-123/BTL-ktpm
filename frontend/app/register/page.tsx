@@ -3,7 +3,6 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { useAuth } from "@/hooks/use-auth";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -16,13 +15,12 @@ export default function RegisterPage() {
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
   const [isLoading, setIsLoading] = useState(false);
-  const { register } = useAuth();
   const router = useRouter();
   const { toast } = useToast();
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    
+
     if (!name || !email || !password || !confirmPassword) {
       toast({
         title: "Error",
@@ -31,7 +29,7 @@ export default function RegisterPage() {
       });
       return;
     }
-    
+
     if (password !== confirmPassword) {
       toast({
         title: "Error",
@@ -40,7 +38,7 @@ export default function RegisterPage() {
       });
       return;
     }
-    
+
     if (password.length < 6) {
       toast({
         title: "Error",
@@ -49,19 +47,31 @@ export default function RegisterPage() {
       });
       return;
     }
-    
+
     setIsLoading(true);
-    
+
     try {
-      const success = await register(name, email, password);
-      if (success) {
-        router.push("/dashboard");
+      const response = await fetch("http://localhost:5000/api/customers/register", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ name, email, password }),
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.message || "Registration failed");
       }
+
+      toast({ title: "Success", description: "Account created successfully!" });
+      router.push("/dashboard");
     } catch (error) {
       console.error("Registration error:", error);
       toast({
         title: "Error",
-        description: "An unexpected error occurred",
+        description:
+          error && typeof error === "object" && "message" in error
+            ? (error as { message: string }).message
+            : "An unexpected error occurred",
         variant: "destructive",
       });
     } finally {

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Filter } from "lucide-react";
 import { FieldGrid } from "@/components/field-grid";
 import { Button } from "@/components/ui/button";
@@ -12,17 +12,35 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Separator } from "@/components/ui/separator";
-import { mockFields } from "@/lib/mock-data";
+import type { Field } from "@/types/field";
 
 export default function FieldsPage() {
   const [isFilterOpen, setIsFilterOpen] = useState(false);
   const [sizeFilter, setSizeFilter] = useState("any");
   const [priceFilter, setPriceFilter] = useState("any");
   const [amenitiesFilter, setAmenitiesFilter] = useState("any");
-  const [filteredFields, setFilteredFields] = useState(mockFields);
+  const [fields, setFields] = useState<Field[]>([]);
+  const [filteredFields, setFilteredFields] = useState<Field[]>([]);
+
+  // Gọi API để lấy danh sách sân bóng
+  useEffect(() => {
+    const fetchFields = async () => {
+      try {
+        const response = await fetch("http://localhost:5000/api/fields");
+        if (!response.ok) throw new Error("Failed to fetch fields");
+
+        const data = await response.json() as Field[]; // Ép kiểu dữ liệu
+        setFields(data);
+        setFilteredFields(data);
+      } catch (error) {
+        console.error("Error fetching fields:", error);
+      }
+    };
+    fetchFields();
+  }, []);
 
   const applyFilters = () => {
-    let filtered = [...mockFields];
+    let filtered = [...fields];
 
     if (sizeFilter !== "any") {
       filtered = filtered.filter(field => field.size === sizeFilter);
@@ -53,7 +71,7 @@ export default function FieldsPage() {
     setSizeFilter("any");
     setPriceFilter("any");
     setAmenitiesFilter("any");
-    setFilteredFields(mockFields);
+    setFilteredFields(fields);
   };
 
   return (
@@ -83,7 +101,7 @@ export default function FieldsPage() {
               <label className="text-sm font-medium mb-1 block">Kích cỡ sân</label>
               <Select value={sizeFilter} onValueChange={setSizeFilter}>
                 <SelectTrigger>
-                  <SelectValue placeholder="Bất kìì" />
+                  <SelectValue placeholder="Bất kì" />
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="any">Kích cỡ bất kì</SelectItem>
@@ -108,9 +126,7 @@ export default function FieldsPage() {
               </Select>
             </div>
             <div>
-              <label className="text-sm font-medium mb-1 block">
-                Tiện nghinghi
-              </label>
+              <label className="text-sm font-medium mb-1 block">Tiện nghi</label>
               <Select value={amenitiesFilter} onValueChange={setAmenitiesFilter}>
                 <SelectTrigger>
                   <SelectValue placeholder="Tiện nghi bất kì" />

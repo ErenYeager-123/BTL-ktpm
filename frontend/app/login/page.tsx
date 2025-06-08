@@ -3,7 +3,6 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { useAuth } from "@/hooks/use-auth";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -14,13 +13,12 @@ export default function LoginPage() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [isLoading, setIsLoading] = useState(false);
-  const { login } = useAuth();
   const router = useRouter();
   const { toast } = useToast();
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    
+
     if (!email || !password) {
       toast({
         title: "Error",
@@ -29,19 +27,32 @@ export default function LoginPage() {
       });
       return;
     }
-    
+
     setIsLoading(true);
-    
+
     try {
-      const success = await login(email, password);
-      if (success) {
-        router.push("/dashboard");
+      const response = await fetch("http://localhost:5000/api/customers/login", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email, password }),
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.message || "Login failed");
       }
+
+      const data = await response.json();
+      localStorage.setItem("token", data.token); // Lưu token để sử dụng sau này
+      router.push("/dashboard");
     } catch (error) {
       console.error("Login error:", error);
       toast({
         title: "Error",
-        description: "An unexpected error occurred",
+        description:
+          typeof error === "object" && error !== null && "message" in error
+            ? String((error as { message?: string }).message)
+            : "An unexpected error occurred",
         variant: "destructive",
       });
     } finally {

@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { mockBookings, mockFields } from "@/lib/mock-data";
+//import { mockBookings, mockFields } from "@/lib/mock-data";
 import { useAuth } from "@/hooks/use-auth";
 import { Field } from "@/types/field";
 import { Booking } from "@/types/booking";
@@ -25,29 +25,40 @@ export default function DashboardPage() {
       return;
     }
 
-    // Simulate API call
-    const fetchBookings = () => {
+    const fetchBookings = async () => {
       setLoading(true);
-      setTimeout(() => {
+      try {
+        const token = localStorage.getItem("token");
+        const res = await fetch("http://localhost:5000/api/bookings", {
+          headers: {
+            Authorization: token ? `Bearer ${token}` : "",
+          },
+        });
+        if (!res.ok) throw new Error("Failed to fetch bookings");
+        const data = await res.json();
+        // data should be an array of bookings, each with a field property
         const today = new Date();
-        const userBookings = mockBookings
-          .filter((booking) => booking.userId === user.id)
-          .map((booking) => {
-            const field = mockFields.find((f) => f.id === booking.fieldId);
-            return { ...booking, field: field! };
-          });
+        const userBookings = data
+          .filter((booking: any) => booking.idKhachHang === user.id)
+          .map((booking: any) => ({
+            ...booking,
+            field: booking.field, // assuming backend populates field info
+          }));
 
         const upcoming = userBookings.filter(
-          (booking) => new Date(booking.date) >= today
+          (booking: any) => new Date(booking.thoigianBatDau) >= today
         );
         const past = userBookings.filter(
-          (booking) => new Date(booking.date) < today
+          (booking: any) => new Date(booking.thoigianBatDau) < today
         );
 
         setUpcomingBookings(upcoming);
         setPastBookings(past);
+      } catch (error) {
+        // handle error
+      } finally {
         setLoading(false);
-      }, 1000);
+      }
     };
 
     fetchBookings();

@@ -75,3 +75,25 @@ exports.deleteField = async (req, res) => {
     res.status(500).json({ message: error.message });
   }
 };
+
+exports.getAllFieldsPublic = async (req, res) => {
+  try {
+    const fields = await FieldModel.getAllFieldsPublic();
+    res.status(200).json(fields);
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
+};
+
+exports.getFieldByIdPublic = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const field = await FieldModel.getFieldByIdPublic(id);
+    if (!field) {
+      return res.status(404).json({ message: "Sân không tồn tại" });
+    }
+    res.status(200).json(field);
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
+};

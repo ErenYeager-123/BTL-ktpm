@@ -10,7 +10,7 @@ import { vi } from "date-fns/locale";
 import { cn } from "@/lib/utils";
 import { ChevronLeft, ChevronRight, Check, Wallet, CreditCard } from "lucide-react";
 import { Separator } from "@/components/ui/separator";
-import { mockFields, timeSlots, isFieldAvailable, paymentMethods } from "@/lib/mock-data";
+import { timeSlots, paymentMethods } from "@/lib/mock-data";
 import { Field } from "@/types/field";
 import { useAuth } from "@/hooks/use-auth";
 import { useToast } from "@/hooks/use-toast";
@@ -42,15 +42,66 @@ export default function BookingPage() {
   const [availableFields, setAvailableFields] = useState<Field[]>([]);
   const [totalPrice, setTotalPrice] = useState(0);
   const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>("cash");
+  const [fields, setFields] = useState<Field[]>([]);
 
+  // Fetch fields from backend
   useEffect(() => {
-    if (fieldId) {
-      const field = mockFields.find((f) => f.id === fieldId);
+    async function fetchFields() {
+      try {
+        const res = await fetch("http://localhost:5000/api/fields");
+        const data = await res.json();
+        setFields(data);
+      } catch (error) {
+        toast({
+          title: "Lỗi",
+          description: "Không thể tải danh sách sân.",
+          variant: "destructive",
+        });
+      }
+    }
+    fetchFields();
+  }, []);
+
+  // Set selected field if fieldId is present
+  useEffect(() => {
+    if (fieldId && fields.length > 0) {
+      const field = fields.find((f) => f.id === fieldId);
       if (field) {
         setSelectedField(field);
       }
     }
-  }, [fieldId]);
+  }, [fieldId, fields]);
+
+  // Check availability from backend
+  useEffect(() => {
+    async function fetchAvailableFields() {
+      if (date && startTime && endTime) {
+        const formattedDate = format(date, "yyyy-MM-dd");
+        const available: Field[] = [];
+        for (const field of fields) {
+          try {
+            const res = await fetch("http://localhost:5000/api/bookings/check-availability", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({
+                fieldId: field.id,
+                startTime: `${formattedDate}T${startTime}:00`,
+                endTime: `${formattedDate}T${endTime}:00`,
+              }),
+            });
+            const data = await res.json();
+            if (data.isAvailable) {
+              available.push(field);
+            }
+          } catch (error) {
+            // Optionally handle error
+          }
+        }
+        setAvailableFields(available);
+      }
+    }
+    fetchAvailableFields();
+  }, [date, startTime, endTime, fields]);
 
   useEffect(() => {
     if (!user && typeof window !== "undefined") {
@@ -72,16 +123,6 @@ export default function BookingPage() {
     }
   }, [selectedField, startTime, endTime]);
 
-  useEffect(() => {
-    if (date && startTime && endTime) {
-      const formattedDate = format(date, "yyyy-MM-dd");
-      const available = mockFields.filter((field) =>
-        isFieldAvailable(field.id, formattedDate, startTime, endTime)
-      );
-      setAvailableFields(available);
-    }
-  }, [date, startTime, endTime]);
-
   const handleNextStep = () => {
     if (step < BookingStep.CONFIRMATION) {
       setStep(step + 1);
@@ -96,12 +137,74 @@ export default function BookingPage() {
     }
   };
 
-  const handleBookingConfirmation = () => {
-    toast({
-      title: "Đặt lịch thành công!",
-      description: `Lịch đặt sân của bạn cho ${selectedField?.name} vào ${date ? format(date, "PPP", { locale: vi }) : ""} đã được xác nhận.`,
-    });
-    router.push("/dashboard");
+  const handleBookingConfirmation = async () => {
+    if (!selectedField || !date || !startTime || !endTime) return;
+
+    const startDateTime = `${format(date, "yyyy-MM-dd")}T${startTime}:00`;
+    const endDateTime = `${format(date, "yyyy-MM-dd")}T${endTime}:00`;
+
+    try {
+      const token = localStorage.getItem("token");
+      const response = await fetch("http://localhost:5000/api/bookings", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: token ? `Bearer ${token}` : "",
+        },
+        body: JSON.stringify({
+          idSan: selectedField.id,
+          thoigianBatDau: startDateTime,
+          thoigianKetThuc: endDateTime,
+          trangThai: paymentMethod === "cash" ? "pending" : "paid",
+        }),
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.message || "Đặt sân thất bại");
+      }
+
+      const data = await response.json();
+      handlePayment(data.idDatSan, totalPrice, paymentMethod);
+
+      toast({
+        title: "Đặt lịch thành công!",
+        description: `Lịch đặt sân của bạn cho ${selectedField.name} vào ${format(date, "PPP", { locale: vi })} đã được xác nhận.`,
+      });
+      router.push("/dashboard");
+    } catch (error) {
+      toast({
+        title: "Lỗi",
+        description: error instanceof Error ? error.message : "Đặt sân thất bại",
+        variant: "destructive",
+      });
+    }
+  };
+
+  const handlePayment = async (bookingId: number, amount: number, method: string) => {
+    try {
+      const token = localStorage.getItem("token");
+      const response = await fetch("http://localhost:5000/api/payments", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: token ? `Bearer ${token}` : "",
+        },
+        body: JSON.stringify({
+          idDatSan: bookingId,
+          soTien: amount,
+          phuongThuc: method,
+        }),
+      });
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.message || "Thanh toán thất bại");
+      }
+      const data = await response.json();
+      // handle success (show toast, redirect, etc.)
+    } catch (error) {
+      // handle error (show toast, etc.)
+    }
   };
 
   const handleTimeSelection = (time: string, isStart: boolean) => {
@@ -380,6 +483,18 @@ export default function BookingPage() {
       default:
         return null;
     }
+  };
+
+  const fetchPayments = async () => {
+    const token = localStorage.getItem("token");
+    const response = await fetch("http://localhost:5000/api/payments", {
+      headers: {
+        Authorization: token ? `Bearer ${token}` : "",
+      },
+    });
+    if (!response.ok) throw new Error("Không thể lấy lịch sử thanh toán");
+    const data = await response.json();
+    // set state with payment data
   };
 
   return (

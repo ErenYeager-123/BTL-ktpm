@@ -30,3 +30,13 @@ exports.createBooking = async (req, res) => {
     res.status(500).json({ message: error.message });
   }
 };
+
+exports.getUserBookings = async (req, res) => {
+  try {
+    const userId = req.user.id;
+    const bookings = await BookingModel.getBookingsByUser(userId);
+    res.status(200).json(bookings);
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
+};
